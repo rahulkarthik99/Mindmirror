@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { authOptions } from "../auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth.config";
 import { prisma } from "@/lib/prisma";
 import { getAiResponse } from "@/services/ai";
 
@@ -8,7 +8,7 @@ export async function POST(req: Request) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session || !(session.user as any)?.id) {
+    if (!session || !session.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -18,7 +18,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Message content is required" }, { status: 400 });
     }
 
-    const userId = (session.user as any).id;
+    const userId = session.user.id;
 
     // Fetch user and check limits
     const user = await prisma.user.findUnique({
@@ -108,11 +108,11 @@ export async function GET(req: Request) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session || !(session.user as any)?.id) {
+    if (!session || !session.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const userId = (session.user as any).id;
+    const userId = session.user.id;
 
     const { searchParams } = new URL(req.url);
     const conversationId = searchParams.get("conversationId");

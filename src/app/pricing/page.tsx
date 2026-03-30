@@ -136,7 +136,7 @@ export default function PricingPage() {
                               currency_code: "USD",
                             },
                             // Pass the userId so we can link the payment to the user in the webhook!
-                            custom_id: (session.user as any)?.id,
+                            custom_id: session.user?.id,
                           },
                         ],
                       });
