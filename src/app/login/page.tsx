@@ -1,15 +1,30 @@
 "use client";
 
 import { signIn } from "next-auth/react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { LogIn } from "lucide-react";
+import { LogIn, AlertCircle } from "lucide-react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 
-export default function LoginPage() {
+import { Suspense } from "react";
+
+function LoginForm() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const registered = searchParams.get("registered");
+
   const [isLoadingGoogle, setIsLoadingGoogle] = useState(false);
   const [isLoadingFacebook, setIsLoadingFacebook] = useState(false);
+  const [isLoadingCredentials, setIsLoadingCredentials] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleLogin = async (provider: "google" | "facebook") => {
+  const [formData, setFormData] = useState({
+    email: "",
+    password: "",
+  });
+
+  const handleOAuthLogin = async (provider: "google" | "facebook") => {
     if (provider === "google") setIsLoadingGoogle(true);
     if (provider === "facebook") setIsLoadingFacebook(true);
 
@@ -17,6 +32,33 @@ export default function LoginPage() {
 
     setIsLoadingGoogle(false);
     setIsLoadingFacebook(false);
+  };
+
+  const handleCredentialsLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoadingCredentials(true);
+    setError(null);
+
+    try {
+      const res = await signIn("credentials", {
+        redirect: false,
+        email: formData.email,
+        password: formData.password,
+        callbackUrl: "/dashboard/chat"
+      });
+
+      if (res?.error) {
+        throw new Error(res.error);
+      }
+
+      if (res?.url) {
+        router.push(res.url);
+      }
+    } catch (err: any) {
+      setError(err.message || "Invalid credentials");
+    } finally {
+      setIsLoadingCredentials(false);
+    }
   };
 
   return (
@@ -34,10 +76,68 @@ export default function LoginPage() {
           <p className="text-gray-500">Sign in to continue to MindMirror</p>
         </div>
 
-        <div className="space-y-4">
+        {registered && (
+          <div className="mb-6 bg-green-50 text-green-700 p-3 rounded-lg text-sm text-center">
+            Account created successfully. Please sign in.
+          </div>
+        )}
+
+        {error && (
+          <div className="mb-6 bg-red-50 text-red-600 p-3 rounded-lg flex items-center space-x-2 text-sm">
+            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleCredentialsLogin} className="space-y-4 mb-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Email
+            </label>
+            <input
+              type="email"
+              required
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
+              placeholder="you@example.com"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Password
+            </label>
+            <input
+              type="password"
+              required
+              value={formData.password}
+              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
+              placeholder="••••••••"
+            />
+          </div>
           <button
-            onClick={() => handleLogin("google")}
-            disabled={isLoadingGoogle || isLoadingFacebook}
+            type="submit"
+            disabled={isLoadingCredentials || isLoadingGoogle || isLoadingFacebook}
+            className="w-full bg-blue-600 text-white font-medium py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 mt-2"
+          >
+            {isLoadingCredentials ? "Signing in..." : "Sign in with Email"}
+          </button>
+        </form>
+
+        <div className="relative mb-6">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-gray-300"></div>
+          </div>
+          <div className="relative flex justify-center text-sm">
+            <span className="px-2 bg-white text-gray-500">Or continue with</span>
+          </div>
+        </div>
+
+        <div className="space-y-4 mb-6">
+          <button
+            onClick={() => handleOAuthLogin("google")}
+            disabled={isLoadingGoogle || isLoadingFacebook || isLoadingCredentials}
             className="w-full flex items-center justify-center space-x-3 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -64,8 +164,8 @@ export default function LoginPage() {
           </button>
 
           <button
-            onClick={() => handleLogin("facebook")}
-            disabled={isLoadingGoogle || isLoadingFacebook}
+            onClick={() => handleOAuthLogin("facebook")}
+            disabled={isLoadingGoogle || isLoadingFacebook || isLoadingCredentials}
             className="w-full flex items-center justify-center space-x-3 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <svg className="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
@@ -76,7 +176,22 @@ export default function LoginPage() {
             </span>
           </button>
         </div>
+
+        <p className="text-center text-sm text-gray-600">
+          Don't have an account?{" "}
+          <Link href="/signup" className="text-blue-600 hover:text-blue-700 font-medium">
+            Sign up
+          </Link>
+        </p>
       </motion.div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-gray-50">Loading...</div>}>
+      <LoginForm />
+    </Suspense>
   );
 }
